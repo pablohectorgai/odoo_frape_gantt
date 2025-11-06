@@ -7,6 +7,7 @@
     "author": "Tu Organización",
     "depends": ["web", "project"],
     "data": [
+        "views/project_task_views.xml",
         "views/gantt_action.xml",
     ],
     "assets": {
