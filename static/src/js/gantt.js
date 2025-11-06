@@ -4,7 +4,7 @@ import { Component, onWillStart, onMounted, useState } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { DateTime } from "luxon";
-import { serializeDateTime } from "@web/core/l10n/dates";
+import { serializeDateTime, parseDateTime } from "@web/core/l10n/dates";
 
 class ProjectGanttClient extends Component {
     setup() {
@@ -60,9 +60,8 @@ class ProjectGanttClient extends Component {
         this.state.tasks = recs.map((t) => ({
             id: t.id,
             name: t.name,
-            // Odoo devuelve UTC en string; lo convertimos a Date UTC
-            start: new Date(t.gantt_start_date.replace(" ", "T") + "Z"),
-            end: new Date(t.gantt_end_date.replace(" ", "T") + "Z"),
+            start: parseDateTime(t.gantt_start_date).toJSDate(),
+            end: parseDateTime(t.gantt_end_date).toJSDate(),
             progress: t.progress || 0,
             custom_class: "pgc-task-" + (t.project_id ? t.project_id[0] : "none"),
         }));
@@ -73,8 +72,10 @@ class ProjectGanttClient extends Component {
     }
 
     _renderGantt() {
-        if (!window.Gantt) {
+        const GanttCtor = window.Gantt || window.FrappeGantt;
+        if (!GanttCtor) {
             this.notification.add("No se pudo cargar la librería de Gantt (frappe-gantt).", { type: "danger" });
+            console.error("frappe-gantt no cargado: window.Gantt/window.FrappeGantt no definidos");
             return;
         }
         const options = {
@@ -82,14 +83,20 @@ class ProjectGanttClient extends Component {
             bar_height: 24,
             padding: 18,
             column_width: 36,
-            custom_popup_html: (task) => `
-                <div class="details-container">
-                  <h5>${task.name}</h5>
-                  <p>Inicio: ${task._start.toISOString().slice(0,16).replace('T',' ')}</p>
-                  <p>Fin: ${task._end.toISOString().slice(0,16).replace('T',' ')}</p>
-                  <p>Progreso: ${task.progress || 0}%</p>
-                </div>
-            `,
+            custom_popup_html: (task) => {
+                const s = task.start || task._start;
+                const e = task.end || task._end;
+                const sTxt = s ? DateTime.fromJSDate(s).toFormat("yyyy-LL-dd HH:mm") : "";
+                const eTxt = e ? DateTime.fromJSDate(e).toFormat("yyyy-LL-dd HH:mm") : "";
+                return `
+                    <div class="details-container">
+                        <h5>${task.name}</h5>
+                        <p>Inicio: ${sTxt}</p>
+                        <p>Fin: ${eTxt}</p>
+                        <p>Progreso: ${task.progress || 0}%</p>
+                    </div>
+                `;
+            },
             on_click: (task) => {
                 this.action.doAction({
                     type: "ir.actions.act_window",
@@ -108,13 +115,21 @@ class ProjectGanttClient extends Component {
                         gantt_end_date: endStr,
                     });
                     this.notification.add("Fechas actualizadas.", { type: "success" });
-                } catch {
+                } catch (e) {
+                    console.error(e);
                     this.notification.add("No se pudo actualizar la tarea.", { type: "danger" });
                     await this._loadTasks();
                 }
             },
+            on_progress_change: async (task, progress) => {
+                try {
+                    await this.orm.write("project.task", [task.id], { progress });
+                } catch (e) {
+                    console.warn("No se pudo actualizar el progreso", e);
+                }
+            },
         };
-        this.gantt = new window.Gantt(this.refs.gantt, this.state.tasks, options);
+        this.gantt = new GanttCtor(this.refs.gantt, this.state.tasks, options);
     }
 
     async reload() {
