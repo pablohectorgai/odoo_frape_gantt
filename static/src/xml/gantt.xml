@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+  <t t-name="project_gantt_community.GanttClientAction" owl="1">
+    <div class="pgc_container">
+      <div class="pgc_toolbar">
+        <label>Proyecto:</label>
+        <select t-att-value="state.project_id" t-on-change="onProjectChange">
+          <option value="0">Todos</option>
+          <t t-foreach="state.projects" t-as="p" t-key="p.id">
+            <option t-att-value="p.id"><t t-esc="p.name"/></option>
+          </t>
+        </select>
+
+        <label>Desde:</label>
+        <input type="date" t-att-value="state.date_from" t-on-change="onDateChange"/>
+        <label>Hasta:</label>
+        <input type="date" t-att-value="state.date_to" t-on-change="onDateChange"/>
+
+        <span class="o_separator">|</span>
+        <button class="btn btn-secondary" t-on-click="setViewMode" data-mode="Day">Día</button>
+        <button class="btn btn-secondary" t-on-click="setViewMode" data-mode="Week">Semana</button>
+        <button class="btn btn-secondary" t-on-click="setViewMode" data-mode="Month">Mes</button>
+
+        <button class="btn btn-primary" t-on-click="reload">Actualizar</button>
+      </div>
+      <div class="pgc_gantt" t-ref="gantt"/>
+    </div>
+  </t>
+</templates>
